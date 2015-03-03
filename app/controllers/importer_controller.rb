@@ -114,13 +114,13 @@ class ImporterController < ApplicationController
     CSV.open(tmpfilepath, {:headers => true, :encoding => encoding, :quote_char => wrapper, :col_sep => splitter}) do |csv|
       csv.each do |row|
 
-        project = Project.find_by_name(row[attrs_map["project"]])
-        tracker = Tracker.find_by_name(row[attrs_map["tracker"]])
-        status = IssueStatus.find_by_name(row[attrs_map["status"]])
-        author = User.find_by_login(row[attrs_map["author"]])
-        priority = Enumeration.find_by_name(row[attrs_map["priority"]])
-        category = IssueCategory.find_by_name(row[attrs_map["category"]])
-        assigned_to = User.find_by_login(row[attrs_map["assigned_to"]])
+        project = Project.find_by(:name => row[attrs_map["project"]])
+        tracker = Tracker.find_by(:name => row[attrs_map["tracker"]])
+        status = IssueStatus.find_by(:name => row[attrs_map["status"]])
+        author = User.find_by(:login => row[attrs_map["author"]])
+        priority = Enumeration.find_by(:name => row[attrs_map["priority"]])
+        category = IssueCategory.find_by(:name => row[attrs_map["category"]])
+        assigned_to = User.find_by(:login => row[attrs_map["assigned_to"]])
 
         # new issue or find exists one
         issue = Issue.new
@@ -128,7 +128,7 @@ class ImporterController < ApplicationController
         issue.project_id = project ? project.id : @project.id
         issue.tracker_id = tracker ? tracker.id : default_tracker
         issue.author_id = author && author.class.name != "AnonymousUser" ? author.id : User.current.id
-        fixed_version = Version.find_by_name_and_project_id(row[attrs_map["fixed_version"]], issue.project_id)
+        fixed_version = Version.find_by(:name => row[attrs_map["fixed_version"]], :project_id => issue.project_id)
 
         if update_issue
           # custom field
@@ -142,13 +142,16 @@ class ImporterController < ApplicationController
           end
 
           if unique_attr == "id"
-            issues = [Issue.find_by_id(row[unique_field])]
+            issues = [Issue.find_by(row[unique_field])]
           else
             query = Query.new(:name => "_importer", :project => @project)
             query.add_filter("status_id", "*", [1])
             query.add_filter(unique_attr, "=", [row[unique_field]])
 
-            issues = Issue.find :all, :conditions => query.statement, :limit => 2, :include => [ :assigned_to, :status, :tracker, :project, :priority, :category, :fixed_version ]
+            issues = Issue.includes([:assigned_to, :status, :tracker, :project, :priority, :category, :fixed_version]).
+                           where(query.statement).
+                           references([:assigned_to, :status, :tracker, :project, :priority, :category, :fixed_version]).
+                           limit(2)
           end
 
           if issues.size > 1
@@ -179,7 +182,7 @@ class ImporterController < ApplicationController
         end
 
         # project affect
-        project = Project.find_by_id(issue.project_id) if project.nil?
+        project = Project.find_by(issue.project_id) if project.nil?
 
         @affect_projects_issues[project.name] += 1
 
