@@ -1,4 +1,10 @@
 RedmineApp::Application.routes.draw do
-  match 'projects/:project_id/issues/import', :controller => 'importer', :action => 'index', :via => [:get, :post]
-  match 'projects/:project_id/issues/import/:action', :controller => 'importer', :via => [:get, :post]
+  resources :projects do
+    resources :importer, :path => 'issues/import', :only => [:index] do
+      collection do
+        post :match
+        post :result
+      end
+    end
+  end
 end
